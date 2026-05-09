@@ -331,8 +331,7 @@
     <!-- 헤더 -->
     <div class="header">
         <div class="header-avatar" id="headerAvatar">
-            <!-- 추후 이미지 교체: <img src="로나.png" alt="로나"> -->
-            🧝‍♀️
+            <img src="lona.png" alt="로나" onerror="this.replaceWith(document.createTextNode('🧝‍♀️'))">
         </div>
         <div class="header-info">
             <div class="header-name">로나</div>
@@ -417,7 +416,7 @@
         }
 
         row.innerHTML = `
-            <div class="bot-avatar">🧝‍♀️</div>
+            <div class="bot-avatar"><img src="lona.png" alt="로나" onerror="this.replaceWith(document.createTextNode('🧝‍♀️'))"></div>
             <div class="bot-content">
                 <div class="bot-name-label">로나</div>
                 <div class="bot-bubble">${esc(text)}</div>
@@ -434,7 +433,7 @@
         row.className = 'msg-row bot';
         row.id = 'loadingRow';
         row.innerHTML = `
-            <div class="bot-avatar">🧝‍♀️</div>
+            <div class="bot-avatar"><img src="lona.png" alt="로나" onerror="this.replaceWith(document.createTextNode('🧝‍♀️'))"></div>
             <div class="bot-content">
                 <div class="bot-name-label">로나</div>
                 <div class="bot-bubble">
@@ -472,6 +471,7 @@
         try {
             const res = await fetch(API_URL, {
                 method: 'POST',
+                mode: 'cors',                          // CORS 명시
                 headers: {
                     'Content-Type': 'application/json',
                     'ngrok-skip-browser-warning': 'true'
@@ -479,9 +479,34 @@
                 body: JSON.stringify({ question: text })
             });
 
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            // OPTIONS preflight나 비정상 응답 차단
+            if (res.status === 0 || res.type === 'opaque') {
+                throw new Error('CORS 차단 또는 네트워크 오류');
+            }
 
-            const data = await res.json();
+            // HTTP 에러 코드 먼저 확인 (4xx, 5xx)
+            if (!res.ok) {
+                throw new Error(`서버 오류 (HTTP ${res.status})`);
+            }
+
+            // text()로 먼저 받아서 빈 응답 방어
+            const rawText = await res.text();
+
+            if (!rawText || rawText.trim() === '') {
+                throw new Error('빈 응답');
+            }
+
+            // JSON 파싱 시도 — 실패 시 텍스트 그대로 표시
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch {
+                // JSON이 아닌 텍스트(HTML 에러 페이지 등)가 왔을 때
+                appendBotMessage('서버에서 올바른 응답을 받지 못했어. 잠시 후 다시 시도해줘! 😅');
+                console.error('[로나] JSON 파싱 실패. 원본 응답:', rawText.slice(0, 200));
+                return;
+            }
+
             removeLoading();
 
             if (data.success && data.answer) {
@@ -489,15 +514,16 @@
             } else {
                 appendBotMessage('앗, 답변을 가져오지 못했어! 잠시 후 다시 물어봐줘~ 😅');
             }
+
         } catch (err) {
             removeLoading();
             appendBotMessage('서버에 연결하지 못했어. 잠시 후 다시 시도해줘! 💦');
-            console.error('[로나] 오류:', err);
+            console.error('[로나] 오류:', err.message);
+        } finally {
+            isLoading = false;
+            sendBtn.disabled = false;
+            userInput.focus();
         }
-
-        isLoading = false;
-        sendBtn.disabled = false;
-        userInput.focus();
     }
 
     // ── 스크롤 맨 아래로 ──
