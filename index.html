@@ -181,6 +181,23 @@
             white-space: pre-wrap;
         }
 
+        /* ── 봇 메시지 마크다운 헤더 스타일 ── */
+        .bot-h1 {
+            display: block;
+            font-size: 1.15em;
+            font-weight: 700;
+            margin-top: 4px;
+            margin-bottom: 6px;
+        }
+
+        .bot-h2, .bot-h3 {
+            display: block;
+            font-size: 1em;
+            font-weight: 700;
+            margin-top: 2px;
+            margin-bottom: 4px;
+        }
+
         /* ── 로딩 점 애니메이션 ── */
         .loading-dots {
             display: flex;
@@ -419,7 +436,7 @@
             <div class="bot-avatar"><img src="lona.png" alt="로나" onerror="this.replaceWith(document.createTextNode('🧝‍♀️'))"></div>
             <div class="bot-content">
                 <div class="bot-name-label">로나</div>
-                <div class="bot-bubble">${esc(text)}</div>
+                <div class="bot-bubble">${processBotMarkdown(text)}</div>
                 ${sourcesHtml}
             </div>
         `;
@@ -539,6 +556,37 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/\n/g, '<br>');
+    }
+
+    // ── 봇 메시지 마크다운 처리 (XSS 안전) ──
+    function processBotMarkdown(text) {
+        // 1단계: HTML 이스케이프 (줄바꿈은 나중에 처리)
+        let result = String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        
+        // 2단계: 깨진 유니코드 문자 제거 (\uFFFD)
+        result = result.replace(/\uFFFD/g, '');
+        
+        // 3단계: 마크다운 처리 (안전한 패턴만)
+        // **텍스트** → <strong>텍스트</strong>
+        result = result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        
+        // # 제목 → <span class="bot-h1">제목</span> (한 글자 이상)
+        result = result.replace(/^# (.+)$/gm, '<span class="bot-h1">$1</span>');
+        
+        // ## 제목 → <span class="bot-h2">제목</span>
+        result = result.replace(/^## (.+)$/gm, '<span class="bot-h2">$1</span>');
+        
+        // ### 제목 → <span class="bot-h3">제목</span>
+        result = result.replace(/^### (.+)$/gm, '<span class="bot-h3">$1</span>');
+        
+        // 4단계: 줄바꿈 처리
+        result = result.replace(/\n/g, '<br>');
+        
+        return result;
     }
 </script>
 
